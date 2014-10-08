@@ -41,6 +41,10 @@ public class DeployerWizardBinder extends WizardPage implements Listener {
 		this.systemPlatform = si;
 	}
 
+	public Table getTable() {
+		return this.table;
+	}
+
 	@Override
 	public void createControl(Composite parent) {
 		GridData gd;
@@ -105,12 +109,13 @@ public class DeployerWizardBinder extends WizardPage implements Listener {
 
 			TableItem item = new TableItem(table, SWT.NULL);
 
-			TableEditor editor = new TableEditor(table);
+			TableEditor editor;
 			editor = new TableEditor(table);
 			Text text = new Text(table, SWT.NONE);
 			text.setText(ci.getName());
 			editor.grabHorizontal = true;
 			editor.setEditor(text, item, 0);
+			item.setData("function", ci.getName());
 
 			editor = new TableEditor(table);
 			CCombo combo = new CCombo(table, SWT.NONE);
@@ -119,6 +124,7 @@ public class DeployerWizardBinder extends WizardPage implements Listener {
 			}
 			editor.grabHorizontal = true;
 			editor.setEditor(combo, item, 1);
+			item.setData("platform", combo);
 
 			table.setBounds(25, 25, 220, 200);
 		}
