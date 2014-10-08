@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.0"?>
+<plugin>
+ <extension point="org.eclipse.ui.commands">
+	   <command id="edu.cmu.sei.eraces.commands.deployer" name="Deployer" defaultHandler="edu.cmu.sei.eraces.handlers.DeployHandler"></command>
+   </extension>
+	
+   <extension point="org.eclipse.ui.menus">
+	<menuContribution locationURI="menu:org.eclipse.ui.main.menu?after=additions">		
+		<menu id="edu.cmu.sei.eraces.menu" label="ERACES">
+
+			<command commandId="edu.cmu.sei.eraces.commands.deployer" style="push"/>
+		</menu>
+	</menuContribution>
+	<menuContribution allPopups="false" locationURI="popup:#TextEditorContext?after=additions">
+		<menu id="edu.cmu.sei.eraces.menu" label="ERACES"/>
+	</menuContribution>
+	<menuContribution allPopups="false" locationURI="popup:org.osate.xtext.aadl2.ui.outline?after=additions">
+		<menu id="edu.cmu.sei.eraces.menu" label="ERACES">
+			<command commandId="edu.cmu.sei.eraces.commands.deployer" style="push"/>
+	</menu>
+	</menuContribution>
+   </extension>
+   <extension
+         id="edu.cmu.sei.eraces.marker"
+         name="Deployer Marker"
+         point="org.eclipse.core.resources.markers">
+      <super type="org.osate.aadl2.modelsupport.AadlObjectMarker"/>
+      <persistent value="true"/>
+   </extension>
+
+   
+</plugin>
