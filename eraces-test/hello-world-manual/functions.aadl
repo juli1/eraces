@@ -1,0 +1,41 @@
+package hello_world::manual::functions
+public
+
+data int
+end int;
+
+
+abstract function1
+features
+	dout : out data port int;
+end function1;
+
+
+
+abstract function2
+features
+	dout : out data port int;
+end function2;
+
+
+abstract function3
+features
+	din1 : in data port int;
+	din2 : in data port int;
+end function3;
+
+
+system functions
+end functions;
+
+system implementation functions.i
+subcomponents
+	f1 : abstract function1;
+	f2 : abstract function2;
+	f3 : abstract function3;
+connections
+	c0 : port f1.dout -> f3.din1;
+	c1 : port f2.dout -> f3.din2;
+end functions.i;
+
+end hello_world::manual::functions;

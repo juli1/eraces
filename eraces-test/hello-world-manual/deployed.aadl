@@ -1,0 +1,66 @@
+package hello_world::manual::deployed
+public
+
+with hello_world::manual::platform;
+with hello_world::manual::functions;
+
+processor cpu
+end cpu;
+
+
+thread task_sender1 extends hello_world::manual::functions::function1
+end task_sender1;
+
+thread task_sender2 extends hello_world::manual::functions::function2
+end task_sender2;
+
+
+process sender
+features
+    task_sender1_dout : out data port hello_world::manual::functions::int;
+	task_sender2_dout : out data port hello_world::manual::functions::int;
+end sender;
+
+process implementation sender.i
+subcomponents
+	t1 : thread task_sender1;
+	t2 : thread task_sender2;
+end sender.i;
+
+thread function3 extends hello_world::manual::functions::function3
+end function3;
+
+
+
+process receiver
+features
+	function3_din1 : in data port hello_world::manual::functions::int;
+	function3_din2 : in data port hello_world::manual::functions::int;
+end receiver;
+
+process implementation receiver.i 
+subcomponents
+	function3 : thread function3;
+connections
+	c0 : port function3_din1 -> function3.din1;
+	c1 : port function3_din2 -> function3.din2;
+end receiver.i;
+
+
+system platform
+end platform;
+
+system implementation platform.i
+subcomponents
+	s : process sender.i;
+	r : process receiver;
+	cpu : processor cpu;
+connections
+	c0 : port s.task_sender1_dout -> r.function3_din1;
+	c1 : port s.task_sender2_dout -> r.function3_din2;
+properties
+	actual_processor_binding => (reference (cpu)) applies to s,r;
+end platform.i;
+
+
+end hello_world::manual::deployed;

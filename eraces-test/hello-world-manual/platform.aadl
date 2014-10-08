@@ -1,0 +1,42 @@
+package hello_world::manual::platform
+public
+
+processor cpu
+end cpu;
+
+
+thread task_sender1
+end task_sender1;
+
+thread task_sender2
+end task_sender2;
+
+process sender
+end sender;
+
+process implementation sender.i
+subcomponents
+	t1 : thread task_sender1;
+	t2 : thread task_sender2;
+end sender.i;
+
+
+
+process receiver
+end receiver;
+
+
+system platform
+end platform;
+
+system implementation platform.i
+subcomponents
+	s : process sender.i;
+	r : process receiver;
+	cpu : processor cpu;
+properties
+	actual_processor_binding => (reference (cpu)) applies to s,r;
+end platform.i;
+
+
+end hello_world::manual::platform;
