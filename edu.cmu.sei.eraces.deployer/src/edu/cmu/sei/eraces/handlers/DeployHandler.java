@@ -39,7 +39,29 @@
  */
 package edu.cmu.sei.eraces.handlers;
 
+import org.eclipse.core.commands.ExecutionEvent;
+import org.eclipse.core.commands.ExecutionException;
+import org.eclipse.jface.wizard.WizardDialog;
+import org.eclipse.ui.IWorkbench;
+import org.eclipse.ui.IWorkbenchWindow;
+import org.eclipse.ui.PlatformUI;
+
+import edu.cmu.sei.eraces.wizards.DeployerWizard;
 
 public final class DeployHandler extends AbstractAadlHandler {
+
+	@Override
+	public Object execute(ExecutionEvent event) throws ExecutionException {
+		final IWorkbench wb = PlatformUI.getWorkbench();
+		final IWorkbenchWindow window = wb.getActiveWorkbenchWindow();
+
+		DeployerWizard wizard = new DeployerWizard();
+		wizard.init(wb, null);
+		// Instantiates the wizard container with the wizard and opens it
+		WizardDialog dialog = new WizardDialog(window.getShell(), wizard);
+		dialog.create();
+		dialog.open();
+		return null;
+	}
 
 }
