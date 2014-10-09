@@ -81,6 +81,10 @@ public class DeployerWizardBinder extends WizardPage implements Listener {
 
 	}
 
+	/**
+	 * Load Table fills the table with the content
+	 * of the system and platform system instances.
+	 */
 	public void loadTable() {
 		List<String> platformComponents;
 
@@ -95,6 +99,7 @@ public class DeployerWizardBinder extends WizardPage implements Listener {
 		platformComponents = new ArrayList<String>();
 
 		for (ComponentInstance ci : this.systemPlatform.getAllComponentInstances()) {
+			/* Just remove the main system instance */
 			if (ci instanceof SystemInstance) {
 				continue;
 			}
@@ -103,6 +108,7 @@ public class DeployerWizardBinder extends WizardPage implements Listener {
 
 		for (ComponentInstance ci : this.systemFunctions.getAllComponentInstances()) {
 
+			/* Just remove the main system instance */
 			if (ci instanceof SystemInstance) {
 				continue;
 			}
@@ -115,15 +121,32 @@ public class DeployerWizardBinder extends WizardPage implements Listener {
 			text.setText(ci.getName());
 			editor.grabHorizontal = true;
 			editor.setEditor(text, item, 0);
+			/**
+			 * Associate the function name with the key
+			 * "function" in the TableItem. It will then
+			 * help to get the function name later on.
+			 */
 			item.setData("function", ci.getName());
 
 			editor = new TableEditor(table);
 			CCombo combo = new CCombo(table, SWT.NONE);
+
+			/**
+			 * We create a combo that contains
+			 * all the platform components.
+			 */
 			for (String s : platformComponents) {
 				combo.add(s);
 			}
+
 			editor.grabHorizontal = true;
 			editor.setEditor(combo, item, 1);
+
+			/**
+			 * Associate the platform component name with the key
+			 * "platform" in the TableItem. It will then
+			 * help to get the platform component name later on.
+			 */
 			item.setData("platform", combo);
 
 			table.setBounds(25, 25, 220, 200);

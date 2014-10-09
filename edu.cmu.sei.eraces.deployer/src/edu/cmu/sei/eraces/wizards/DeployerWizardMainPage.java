@@ -22,7 +22,6 @@ import org.eclipse.swt.widgets.Listener;
 import org.osate.aadl2.instance.SystemInstance;
 import org.osate.aadl2.modelsupport.modeltraversal.TraverseWorkspace;
 import org.osate.aadl2.modelsupport.resources.OsateResourceUtil;
-import org.osate.aadl2.util.OsateDebug;
 
 public class DeployerWizardMainPage extends WizardPage implements Listener {
 	private Combo functionSystem;
@@ -41,6 +40,9 @@ public class DeployerWizardMainPage extends WizardPage implements Listener {
 
 		systems = new ArrayList<SystemInstance>();
 
+		/**
+		 * Get all instances files in the workspace.
+		 */
 		instanceFiles = TraverseWorkspace.getInstanceModelFilesInWorkspace();
 		iteratorFile = instanceFiles.iterator();
 
@@ -56,7 +58,7 @@ public class DeployerWizardMainPage extends WizardPage implements Listener {
 			target = res.getContents().get(0);
 
 			if (target instanceof SystemInstance) {
-				OsateDebug.osateDebug("system=" + target);
+//				OsateDebug.osateDebug("system=" + target);
 				systems.add((SystemInstance) target);
 			}
 		}
@@ -101,10 +103,14 @@ public class DeployerWizardMainPage extends WizardPage implements Listener {
 
 	@Override
 	public void handleEvent(Event event) {
-		// TODO Auto-generated method stub
 
 	}
 
+	/**
+	 * Retrieve the system instance that was selected
+	 * for all the function components.
+	 * @return
+	 */
 	public SystemInstance getSystemFunctions() {
 		for (SystemInstance si : systems) {
 			if (si.getName().equalsIgnoreCase(functionSystem.getText())) {
@@ -114,6 +120,11 @@ public class DeployerWizardMainPage extends WizardPage implements Listener {
 		return null;
 	}
 
+	/**
+	 * Retrieve the system instance that was selected for all the
+	 * platform components.
+	 * @return
+	 */
 	public SystemInstance getSystemPlatform() {
 		for (SystemInstance si : systems) {
 			if (si.getName().equalsIgnoreCase(platformSystem.getText())) {
@@ -123,13 +134,19 @@ public class DeployerWizardMainPage extends WizardPage implements Listener {
 		return null;
 	}
 
+	/**
+	 * Prepare the binder page with the selected system instances
+	 * for the functions and platform components.
+	 */
 	public IWizardPage getNextPage() {
 		DeployerWizardBinder dwb;
+
 		dwb = ((DeployerWizard) getWizard()).getBinderPage();
 		dwb.setSystemPlatform(getSystemPlatform());
 		dwb.setSystemFunctions(getSystemFunctions());
 		dwb.loadTable();
 		return dwb;
+
 	}
 
 }
