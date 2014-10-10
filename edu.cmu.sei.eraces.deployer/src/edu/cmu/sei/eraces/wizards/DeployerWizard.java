@@ -1,12 +1,11 @@
 package edu.cmu.sei.eraces.wizards;
 
+import java.io.ByteArrayInputStream;
 import java.util.HashMap;
 
 import org.eclipse.core.resources.IFile;
-import org.eclipse.core.resources.ResourcesPlugin;
-import org.eclipse.core.runtime.IPath;
-import org.eclipse.core.runtime.Path;
-import org.eclipse.emf.common.util.URI;
+import org.eclipse.core.resources.IResource;
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.wizard.Wizard;
 import org.eclipse.swt.custom.CCombo;
@@ -14,11 +13,18 @@ import org.eclipse.swt.widgets.Table;
 import org.eclipse.swt.widgets.TableItem;
 import org.eclipse.ui.INewWizard;
 import org.eclipse.ui.IWorkbench;
+import org.eclipse.xtext.serializer.impl.Serializer;
+import org.eclipse.xtext.ui.util.ResourceUtil;
+import org.osate.aadl2.AadlPackage;
 import org.osate.aadl2.instance.ComponentInstance;
 import org.osate.aadl2.instance.SystemInstance;
 import org.osate.aadl2.util.Aadl2ResourceImpl;
 import org.osate.aadl2.util.OsateDebug;
 
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+
+import edu.cmu.sei.eraces.deployer.Deployer;
 import edu.cmu.sei.eraces.util.Utils;
 
 public class DeployerWizard extends Wizard implements INewWizard {
@@ -32,8 +38,15 @@ public class DeployerWizard extends Wizard implements INewWizard {
 	private DeployerWizardMainPage mainPage;
 	private DeployerWizardBinder binderPage;
 
+	private Injector injector;
+	private Serializer serializer;
+
 	public DeployerWizard() {
+
 		super();
+
+		injector = Guice.createInjector(new org.osate.xtext.aadl2.Aadl2RuntimeModule());
+		serializer = injector.getInstance(Serializer.class);
 	}
 
 	public DeployerWizardBinder getBinderPage() {
@@ -119,15 +132,34 @@ public class DeployerWizard extends Wizard implements INewWizard {
 
 		Aadl2ResourceImpl aadlSystemPlatformResource = (Aadl2ResourceImpl) systemPlatform.eResource();
 
-		OsateDebug.osateDebug("resource=" + aadlSystemPlatformResource);
+		IFile deployedModel = ResourceUtil.getFile(aadlSystemPlatformResource).getProject().getFile("deployed.aadl");
+		Deployer deployer = new Deployer(systemFunction, systemPlatform, platformComponentToFunction,
+				functionsToPlatformComponent);
+		AadlPackage deployedPackage = deployer.generateDeployedModel();
+		injector = Guice.createInjector(new org.osate.xtext.aadl2.Aadl2RuntimeModule());
+		serializer = injector.getInstance(Serializer.class);
+		String textModel = serializer.serialize(deployedPackage);
+//		OsateDebug.osateDebug("tostring=" + s);
 
-		String systemFilePath = URI.decode(aadlSystemPlatformResource.getURI().path());
-		IFile systemFile = ResourcesPlugin.getWorkspace().getRoot().getFile(new Path(systemFilePath));
-		IPath newFilePath = systemFile.getParent().getParent().getFullPath().append("deployed.aadl");
+		if (deployedModel.exists()) {
+			try {
+				deployedModel.delete(true, null);
+			} catch (CoreException e) {
+				OsateDebug.osateDebug("DeployerWizard", "Cannot delete old model");
 
-		OsateDebug.osateDebug("path=" + newFilePath);
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
 
-//		MessageDialog.openInformation(workbench.getActiveWorkbenchWindow().getShell(), "bli", "bla");
+		try {
+			deployedModel.create(new ByteArrayInputStream(textModel.getBytes()), IResource.NONE, null);
+		} catch (CoreException e) {
+
+			OsateDebug.osateDebug("DeployerWizard", "Core exception");
+			e.printStackTrace();
+		}
+
 		return false;
 	}
 }

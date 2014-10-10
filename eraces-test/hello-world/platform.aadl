@@ -16,14 +16,21 @@ end sender;
 
 process implementation sender.i
 subcomponents
-	t1 : thread task_sender1;
-	t2 : thread task_sender2;
+	snd1 : thread task_sender1;
+	snd2 : thread task_sender2;
 end sender.i;
 
 
+thread task_receiver1
+end task_receiver1;
 
 process receiver
 end receiver;
+
+process implementation receiver.i
+subcomponents
+	recv : thread task_receiver1;
+end receiver.i;
 
 
 system platform
@@ -32,7 +39,7 @@ end platform;
 system implementation platform.i
 subcomponents
 	s : process sender.i;
-	r : process receiver;
+	r : process receiver.i;
 	cpu : processor cpu;
 properties
 	actual_processor_binding => (reference (cpu)) applies to s,r;

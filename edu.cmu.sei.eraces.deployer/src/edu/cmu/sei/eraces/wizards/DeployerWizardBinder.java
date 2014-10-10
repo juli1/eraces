@@ -17,6 +17,7 @@ import org.eclipse.swt.widgets.Table;
 import org.eclipse.swt.widgets.TableColumn;
 import org.eclipse.swt.widgets.TableItem;
 import org.eclipse.swt.widgets.Text;
+import org.osate.aadl2.ComponentCategory;
 import org.osate.aadl2.instance.ComponentInstance;
 import org.osate.aadl2.instance.SystemInstance;
 
@@ -51,7 +52,6 @@ public class DeployerWizardBinder extends WizardPage implements Listener {
 		Composite composite;
 		GridLayout gl;
 
-		String[] vals = { "blia" };
 		composite = new Composite(parent, SWT.NULL);
 		gl = new GridLayout();
 
@@ -98,12 +98,22 @@ public class DeployerWizardBinder extends WizardPage implements Listener {
 
 		platformComponents = new ArrayList<String>();
 
+		/**
+		 * Fill a list of all platform components that will
+		 * be used to complete the combobox.
+		 */
 		for (ComponentInstance ci : this.systemPlatform.getAllComponentInstances()) {
 			/* Just remove the main system instance */
 			if (ci instanceof SystemInstance) {
 				continue;
 			}
-			platformComponents.add(ci.getName());
+
+			/**
+			 * For now, we just consider the THREAD category.
+			 */
+			if (ci.getCategory() == ComponentCategory.THREAD) {
+				platformComponents.add(ci.getName());
+			}
 		}
 
 		for (ComponentInstance ci : this.systemFunctions.getAllComponentInstances()) {
