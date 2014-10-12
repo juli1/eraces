@@ -1,9 +1,12 @@
 package edu.cmu.sei.eraces.deployer;
 
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 
+import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.emf.ecore.EClass;
-import org.osate.aadl2.Aadl2Factory;
+import org.eclipse.emf.transaction.RecordingCommand;
+import org.eclipse.emf.transaction.TransactionalEditingDomain;
 import org.osate.aadl2.AadlPackage;
 import org.osate.aadl2.Classifier;
 import org.osate.aadl2.ComponentCategory;
@@ -14,6 +17,8 @@ import org.osate.aadl2.Element;
 import org.osate.aadl2.NamedElement;
 import org.osate.aadl2.ProcessImplementation;
 import org.osate.aadl2.Subcomponent;
+import org.osate.aadl2.ThreadSubcomponent;
+import org.osate.aadl2.ThreadType;
 import org.osate.aadl2.instance.ComponentInstance;
 import org.osate.aadl2.instance.SystemInstance;
 import org.osate.aadl2.util.OsateDebug;
@@ -36,6 +41,7 @@ public class Deployer {
 	private SystemInstance functionSystem;
 	private SystemInstance platformSystem;
 	private AadlPackage aadlPkgDeployed;
+	private ThreadType currentThread;
 
 	public Deployer(SystemInstance fs, SystemInstance ps, HashMap<ComponentInstance, ComponentInstance> ptof,
 			HashMap<ComponentInstance, ComponentInstance> ftop) {
@@ -45,29 +51,53 @@ public class Deployer {
 		platformToFunction = ptof;
 	}
 
-	private Classifier createNewThreadClassifier(ComponentType threadType, Classifier functionClassifier) {
-		Classifier newThreadClassifier;
-		EClass claz;
+	private ThreadType createNewThreadClassifier(final ComponentType threadType, Classifier functionClassifier) {
+		ThreadType newThreadClassifier = null;
+		final EClass claz;
 
 		claz = threadType.eClass();
 //		OsateDebug.osateDebug("Deployer", "eclass=" + threadType.getContainingClassifier().getClass());
-//		newThreadClassifier = aadlPkgDeployed.getPublicSection().createOwnedClassifier(claz);
+
+		try {
+			final TransactionalEditingDomain domain = TransactionalEditingDomain.Registry.INSTANCE
+					.getEditingDomain("org.osate.aadl2.ModelEditingDomain");
+//			
+//			final TransactionalEditingDomain domain = TransactionUtil.getEditingDomain(systemFunction);
+
+			domain.getCommandStack().execute(new RecordingCommand(domain) {
+				public void doExecute() {
+					currentThread = (ThreadType) aadlPkgDeployed.getPublicSection().createOwnedClassifier(claz);
+
+					currentThread.setName("thread_" + functionSystem.getName());
+					currentThread.createOwnedExtension().setExtended(threadType);
+
+				}
+			});
+		} catch (OperationCanceledException exception) {
+			OsateDebug.osateDebug("Deployer", "Cancelled");
+			// if here, model did not change because it was interrupted
+		}
+		newThreadClassifier = currentThread;
+//		newThreadClassifier = (ThreadType) aadlPkgDeployed.getPublicSection().createOwnedClassifier(claz);
 //		newThreadClassifier.setName("newthreadbla");
 //		
 
-		newThreadClassifier = Aadl2Factory.eINSTANCE.createThreadType();
-//		newThreadClassifier.setName("blefwefwfablabla");
+//		newThreadClassifier = Aadl2Factory.eINSTANCE.createThreadType();
 
-		newThreadClassifier.setName("thread_" + functionSystem.getName());
-//		newThreadClassifier.createOwnedExtension().setExtended(otherType);
+//		newThreadClassifier = Aadl2Factory.eINSTANCE.createThreadType();
+
+//		newThreadClassifier.setName("blefwefwfablabla");
+//
+//		newThreadClassifier.setName("thread_" + functionSystem.getName());
+//		newThreadClassifier.createOwnedExtension().setExtended(threadType);
 //		if (functionClassifier != null) {
 //			newThreadClassifier.getAllFeatures().addAll(functionClassifier.getAllFeatures());
 //		}
 //
 //		newThreadClassifier.getAllPropertyAssociations().addAll(threadType.getAllPropertyAssociations());
 
-		aadlPkgDeployed.getOwnedPublicSection().getChildren().add(newThreadClassifier);
-//		newThreadClassifier = Aadl2Factory.eINSTANCE.createThreadType();
+//		aadlPkgDeployed.getOwnedPublicSection().getOwnedClassifiers().add(newThreadClassifier);
+//		aadlPkgDeployed.getOwnedPublicSection().getChildren().add(newThreadClassifier);
 
 //		aadlPkgDeployed.getOwnedPublicSection().getMembers().add(newThreadClassifier);
 
@@ -81,13 +111,14 @@ public class Deployer {
 		if (element instanceof ProcessImplementation) {
 			OsateDebug.osateDebug("Deployer", "process=" + element);
 
-			ProcessImplementation process = (ProcessImplementation) element;
-			for (Subcomponent threadSubcomponent : process.getAllSubcomponents()) {
+			final ProcessImplementation process = (ProcessImplementation) element;
+			for (final Subcomponent threadSubcomponent : process.getAllSubcomponents()) {
 
 				/**
 				 * For now, we only consider thread inside a process.
 				 */
-				if (threadSubcomponent.getClassifier().getCategory() != ComponentCategory.THREAD) {
+				if ((threadSubcomponent.getClassifier() != null)
+						&& (threadSubcomponent.getClassifier().getCategory() != ComponentCategory.THREAD)) {
 					continue;
 				}
 
@@ -104,10 +135,41 @@ public class Deployer {
 
 						OsateDebug.osateDebug("Deployer", "classifier="
 								+ functionInstance.getSubcomponent().getClassifier());
-						Classifier newThreadType = createNewThreadClassifier(originalThreadType, functionInstance
+
+						final ThreadType newThreadType = createNewThreadClassifier(originalThreadType, functionInstance
 								.getSubcomponent().getClassifier());
+
+						try {
+							final TransactionalEditingDomain domain = TransactionalEditingDomain.Registry.INSTANCE
+									.getEditingDomain("org.osate.aadl2.ModelEditingDomain");
+//							
+//							final TransactionalEditingDomain domain = TransactionUtil.getEditingDomain(systemFunction);
+
+							domain.getCommandStack().execute(new RecordingCommand(domain) {
+								public void doExecute() {
+
+//									aadlPkgDeployed.getPublicSection().createOwnedClassifier(Thread.class);
+
+									final ThreadSubcomponent ts = process.createOwnedThreadSubcomponent();
+									ts.setThreadSubcomponentType(newThreadType);
+									ts.setName("bla");
+									threadSubcomponent.setRefined(ts);
+
+								}
+							});
+						} catch (OperationCanceledException exception) {
+							OsateDebug.osateDebug("Deployer", "Cancelled");
+							// if here, model did not change because it was interrupted
+						}
+
+//						ThreadType newThreadType = createNewThreadClassifier(originalThreadType, functionInstance
+//								.getSubcomponent().getClassifier());
+
 //						aadlPkgDeployed.getPublicSection().createOwnedClassifier(Thread.class);
-//						threadSubcomponent.setRefined(newThreadType);
+
+//						ThreadSubcomponent ts = process.createOwnedThreadSubcomponent();
+//						ts.setThreadSubcomponentType(newThreadType);
+//						threadSubcomponent.setRefined(ts);
 //						threadSubcomponent.setName("blablabla2");
 //						process.eContents().remove(threadSubcomponent);
 //						process.notify();
@@ -132,16 +194,39 @@ public class Deployer {
 
 	}
 
-	public AadlPackage generateDeployedModel() {
+	public synchronized AadlPackage generateDeployedModel() {
 		AadlPackage aadlPkgOriginal;
 		OsateDebug.osateDebug("Deployer", "platformsystem=" + platformSystem.getComponentClassifier());
 		aadlPkgOriginal = (AadlPackage) platformSystem.getComponentClassifier().eContainer().eContainer();
 //		aadlPkgDeployed = EcoreUtil.copy(aadlPkgOriginal);
 		aadlPkgDeployed = aadlPkgOriginal;
 //		aadlPkgDeployed.setName(aadlPkgOriginal.getName() + "::deployed");
+		final AadlPackage foobar = aadlPkgDeployed;
+		try {
+			final TransactionalEditingDomain domain = TransactionalEditingDomain.Registry.INSTANCE
+					.getEditingDomain("org.osate.aadl2.ModelEditingDomain");
+//			
+//			final TransactionalEditingDomain domain = TransactionUtil.getEditingDomain(systemFunction);
 
-		for (NamedElement el : aadlPkgDeployed.getPublicSection().getMembers()) {
-			processElement(el);
+			domain.getCommandStack().execute(new RecordingCommand(domain) {
+				public void doExecute() {
+					aadlPkgDeployed.setName(foobar.getName() + "::deployed");
+
+				}
+			});
+		} catch (OperationCanceledException exception) {
+			OsateDebug.osateDebug("Deployer", "Cancelled");
+			// if here, model did not change because it was interrupted
+		}
+
+		try {
+
+			for (NamedElement el : aadlPkgDeployed.getPublicSection().getMembers()) {
+				processElement(el);
+			}
+
+		} catch (ConcurrentModificationException cme) {
+			OsateDebug.osateDebug("Deployer", "Concurrent exception");
 		}
 
 		OsateDebug.osateDebug("Deployer", "obj=" + aadlPkgDeployed);
