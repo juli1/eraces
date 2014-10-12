@@ -6,6 +6,9 @@ import java.util.HashMap;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.OperationCanceledException;
+import org.eclipse.emf.transaction.RecordingCommand;
+import org.eclipse.emf.transaction.TransactionalEditingDomain;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.wizard.Wizard;
 import org.eclipse.swt.custom.CCombo;
@@ -132,13 +135,14 @@ public class DeployerWizard extends Wizard implements INewWizard {
 
 		Aadl2ResourceImpl aadlSystemPlatformResource = (Aadl2ResourceImpl) systemPlatform.eResource();
 
-		IFile deployedModel = ResourceUtil.getFile(aadlSystemPlatformResource).getProject().getFile("deployed.aadl");
+		final IFile deployedModel = ResourceUtil.getFile(aadlSystemPlatformResource).getProject()
+				.getFile("deployed.aadl");
 		Deployer deployer = new Deployer(systemFunction, systemPlatform, platformComponentToFunction,
 				functionsToPlatformComponent);
 		AadlPackage deployedPackage = deployer.generateDeployedModel();
 		injector = Guice.createInjector(new org.osate.xtext.aadl2.Aadl2RuntimeModule());
 		serializer = injector.getInstance(Serializer.class);
-		String textModel = serializer.serialize(deployedPackage);
+		final String textModel = serializer.serialize(deployedPackage);
 //		OsateDebug.osateDebug("tostring=" + s);
 
 		if (deployedModel.exists()) {
@@ -153,11 +157,23 @@ public class DeployerWizard extends Wizard implements INewWizard {
 		}
 
 		try {
-			deployedModel.create(new ByteArrayInputStream(textModel.getBytes()), IResource.NONE, null);
-		} catch (CoreException e) {
+			final TransactionalEditingDomain domain = TransactionalEditingDomain.Registry.INSTANCE
+					.getEditingDomain("org.osate.aadl2.ModelEditingDomain");
 
-			OsateDebug.osateDebug("DeployerWizard", "Core exception");
-			e.printStackTrace();
+			domain.getCommandStack().execute(new RecordingCommand(domain) {
+				public void doExecute() {
+					try {
+						deployedModel.create(new ByteArrayInputStream(textModel.getBytes()), IResource.NONE, null);
+					} catch (CoreException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+
+				}
+			});
+		} catch (OperationCanceledException exception) {
+			OsateDebug.osateDebug("Deployer", "Cancelled");
+			// if here, model did not change because it was interrupted
 		}
 
 		return false;

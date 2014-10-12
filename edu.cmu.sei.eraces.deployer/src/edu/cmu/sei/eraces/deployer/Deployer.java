@@ -2,8 +2,12 @@ package edu.cmu.sei.eraces.deployer;
 
 import java.util.HashMap;
 
+import org.eclipse.emf.ecore.EClass;
+import org.osate.aadl2.Aadl2Factory;
 import org.osate.aadl2.AadlPackage;
+import org.osate.aadl2.Classifier;
 import org.osate.aadl2.ComponentCategory;
+import org.osate.aadl2.ComponentType;
 import org.osate.aadl2.Device;
 import org.osate.aadl2.DeviceImplementation;
 import org.osate.aadl2.Element;
@@ -31,6 +35,7 @@ public class Deployer {
 	private HashMap<ComponentInstance, ComponentInstance> functionToPlatform;
 	private SystemInstance functionSystem;
 	private SystemInstance platformSystem;
+	private AadlPackage aadlPkgDeployed;
 
 	public Deployer(SystemInstance fs, SystemInstance ps, HashMap<ComponentInstance, ComponentInstance> ptof,
 			HashMap<ComponentInstance, ComponentInstance> ftop) {
@@ -38,6 +43,22 @@ public class Deployer {
 		platformSystem = ps;
 		functionToPlatform = ftop;
 		platformToFunction = ptof;
+	}
+
+	private Classifier createNewThreadClassifier(ComponentType threadType, ComponentType functionType) {
+		Classifier newThreadClassifier;
+		EClass claz = (EClass) threadType.eClass();
+		OsateDebug.osateDebug("Deployer", "eclass=" + threadType.getContainingClassifier().getClass());
+//		newThreadClassifier = aadlPkgDeployed.getPublicSection().createOwnedClassifier(claz);
+//		newThreadClassifier.setName("newthreadbla");
+//		
+
+		newThreadClassifier = Aadl2Factory.eINSTANCE.createThreadType();
+
+		newThreadClassifier.setName("bwrfwef");
+		aadlPkgDeployed.getOwnedPublicSection().getChildren().add(newThreadClassifier);
+		return newThreadClassifier;
+//		return null;
 	}
 
 	private void processElement(Element element) {
@@ -65,11 +86,12 @@ public class Deployer {
 					 * We found the thread associated with a function.
 					 */
 					if (threadSubcomponent == correspondingPlatformComponent.getSubcomponent()) {
+						ComponentType originalThreadType = threadSubcomponent.getComponentType();
 
-						process.getAllSubcomponents().remove(threadSubcomponent);
-						process.getChildren().remove(threadSubcomponent);
-						process.getMembers().remove(threadSubcomponent);
-						threadSubcomponent.setRefined(threadSubcomponent);
+						Classifier newThreadType = createNewThreadClassifier(originalThreadType, functionInstance
+								.getSubcomponent().getComponentType());
+//						aadlPkgDeployed.getPublicSection().createOwnedClassifier(Thread.class);
+//						threadSubcomponent.setRefined(newThreadType);
 						threadSubcomponent.setName("blablabla2");
 //						process.eContents().remove(threadSubcomponent);
 //						process.notify();
@@ -96,15 +118,17 @@ public class Deployer {
 
 	public AadlPackage generateDeployedModel() {
 		AadlPackage aadlPkgOriginal;
-
+		OsateDebug.osateDebug("Deployer", "platformsystem=" + platformSystem.getComponentClassifier());
 		aadlPkgOriginal = (AadlPackage) platformSystem.getComponentClassifier().eContainer().eContainer();
-		aadlPkgOriginal.setName(aadlPkgOriginal.getName() + "::deployed");
+//		aadlPkgDeployed = EcoreUtil.copy(aadlPkgOriginal);
+		aadlPkgDeployed = aadlPkgOriginal;
+//		aadlPkgDeployed.setName(aadlPkgOriginal.getName() + "::deployed");
 
-		for (NamedElement el : aadlPkgOriginal.getPublicSection().getMembers()) {
+		for (NamedElement el : aadlPkgDeployed.getPublicSection().getMembers()) {
 			processElement(el);
 		}
 
-		OsateDebug.osateDebug("Deployer", "obj=" + aadlPkgOriginal);
-		return aadlPkgOriginal;
+		OsateDebug.osateDebug("Deployer", "obj=" + aadlPkgDeployed);
+		return aadlPkgDeployed;
 	}
 }
