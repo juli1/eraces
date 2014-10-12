@@ -45,18 +45,32 @@ public class Deployer {
 		platformToFunction = ptof;
 	}
 
-	private Classifier createNewThreadClassifier(ComponentType threadType, ComponentType functionType) {
+	private Classifier createNewThreadClassifier(ComponentType threadType, Classifier functionClassifier) {
 		Classifier newThreadClassifier;
-		EClass claz = (EClass) threadType.eClass();
-		OsateDebug.osateDebug("Deployer", "eclass=" + threadType.getContainingClassifier().getClass());
+		EClass claz;
+
+		claz = threadType.eClass();
+//		OsateDebug.osateDebug("Deployer", "eclass=" + threadType.getContainingClassifier().getClass());
 //		newThreadClassifier = aadlPkgDeployed.getPublicSection().createOwnedClassifier(claz);
 //		newThreadClassifier.setName("newthreadbla");
 //		
 
 		newThreadClassifier = Aadl2Factory.eINSTANCE.createThreadType();
+//		newThreadClassifier.setName("blefwefwfablabla");
 
-		newThreadClassifier.setName("bwrfwef");
+		newThreadClassifier.setName("thread_" + functionSystem.getName());
+//		newThreadClassifier.createOwnedExtension().setExtended(otherType);
+//		if (functionClassifier != null) {
+//			newThreadClassifier.getAllFeatures().addAll(functionClassifier.getAllFeatures());
+//		}
+//
+//		newThreadClassifier.getAllPropertyAssociations().addAll(threadType.getAllPropertyAssociations());
+
 		aadlPkgDeployed.getOwnedPublicSection().getChildren().add(newThreadClassifier);
+//		newThreadClassifier = Aadl2Factory.eINSTANCE.createThreadType();
+
+//		aadlPkgDeployed.getOwnedPublicSection().getMembers().add(newThreadClassifier);
+
 		return newThreadClassifier;
 //		return null;
 	}
@@ -88,11 +102,13 @@ public class Deployer {
 					if (threadSubcomponent == correspondingPlatformComponent.getSubcomponent()) {
 						ComponentType originalThreadType = threadSubcomponent.getComponentType();
 
+						OsateDebug.osateDebug("Deployer", "classifier="
+								+ functionInstance.getSubcomponent().getClassifier());
 						Classifier newThreadType = createNewThreadClassifier(originalThreadType, functionInstance
-								.getSubcomponent().getComponentType());
+								.getSubcomponent().getClassifier());
 //						aadlPkgDeployed.getPublicSection().createOwnedClassifier(Thread.class);
 //						threadSubcomponent.setRefined(newThreadType);
-						threadSubcomponent.setName("blablabla2");
+//						threadSubcomponent.setName("blablabla2");
 //						process.eContents().remove(threadSubcomponent);
 //						process.notify();
 						OsateDebug.osateDebug("Deployer", "FOUND association of " + threadSubcomponent.getName()

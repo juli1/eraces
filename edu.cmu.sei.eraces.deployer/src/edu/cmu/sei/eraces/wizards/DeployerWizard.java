@@ -159,6 +159,8 @@ public class DeployerWizard extends Wizard implements INewWizard {
 		try {
 			final TransactionalEditingDomain domain = TransactionalEditingDomain.Registry.INSTANCE
 					.getEditingDomain("org.osate.aadl2.ModelEditingDomain");
+//			
+//			final TransactionalEditingDomain domain = TransactionUtil.getEditingDomain(systemFunction);
 
 			domain.getCommandStack().execute(new RecordingCommand(domain) {
 				public void doExecute() {

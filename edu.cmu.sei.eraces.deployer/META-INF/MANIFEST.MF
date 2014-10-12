@@ -17,4 +17,5 @@ Require-Bundle: org.osate.aadl2,
  org.eclipse.core.resources
 Eclipse-LazyStart: true
 Import-Package: org.eclipse.emf.transaction,
+ org.eclipse.emf.transaction.util,
  org.osate.contribution.sei.names
