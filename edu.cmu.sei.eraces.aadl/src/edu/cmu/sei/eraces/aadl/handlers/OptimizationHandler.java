@@ -5,7 +5,6 @@ import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.ResourcesPlugin;
-import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
@@ -18,8 +17,11 @@ import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PlatformUI;
 import org.osate.aadl2.SystemImplementation;
+import org.osate.aadl2.instance.SystemInstance;
+import org.osate.aadl2.instantiation.InstantiateModel;
 
 import edu.cmu.sei.eraces.aadl.PreferenceConstants;
+import edu.cmu.sei.eraces.aadl.logic.OptimizationLogic;
 import edu.cmu.sei.eraces.aadl.util.SelectionHelper;
 
 public class OptimizationHandler extends AbstractHandler {
@@ -51,12 +53,16 @@ public class OptimizationHandler extends AbstractHandler {
 				@Override
 				protected IStatus run(IProgressMonitor monitor) {
 					System.out.println("[OptimizationHandler] here");
-
-					// Refresh the project
+					SystemInstance instance;
 					try {
+						instance = InstantiateModel.buildInstanceModelFile(systemImplementation);
+						OptimizationLogic logic = new OptimizationLogic(instance);
+						logic.process();
 						projectResource.refreshLocal(IResource.DEPTH_INFINITE, null);
-					} catch (CoreException ex) {
-						throw new RuntimeException(ex);
+						// Refresh the project
+					} catch (Exception e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
 					}
 
 					return Status.OK_STATUS;
@@ -72,5 +78,4 @@ public class OptimizationHandler extends AbstractHandler {
 
 		return null;
 	}
-
 }
