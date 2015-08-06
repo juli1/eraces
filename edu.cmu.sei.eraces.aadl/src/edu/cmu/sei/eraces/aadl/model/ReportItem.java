@@ -3,16 +3,16 @@ package edu.cmu.sei.eraces.aadl.model;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.osate.aadl2.instance.ComponentInstance;
+import org.osate.aadl2.NamedElement;
 
 public class ReportItem implements Comparable {
 	private Category category;
 	private String justification;
 	private Severity severity;
-	private List<ComponentInstance> relatedComponents;
+	private List<NamedElement> relatedElements;
 
 	public ReportItem() {
-		this.relatedComponents = new ArrayList<ComponentInstance>();
+		this.relatedElements = new ArrayList<NamedElement>();
 		this.category = Category.UNKNOWN;
 		this.severity = Severity.NORMAL;
 	}
@@ -41,16 +41,16 @@ public class ReportItem implements Comparable {
 		return this.justification;
 	}
 
-	public void addRelatedComponent(ComponentInstance ci) {
-		this.relatedComponents.add(ci);
+	public void addRelatedElement(NamedElement ci) {
+		this.relatedElements.add(ci);
 	}
 
-	public void setRelatedComponent(List<ComponentInstance> l) {
-		this.relatedComponents = l;
+	public void setRelatedElements(List<NamedElement> l) {
+		this.relatedElements = l;
 	}
 
-	public List<ComponentInstance> getRelatedComponents() {
-		return this.relatedComponents;
+	public List<NamedElement> getRelatedElements() {
+		return this.relatedElements;
 	}
 
 	public int compareTo(Object arg) {

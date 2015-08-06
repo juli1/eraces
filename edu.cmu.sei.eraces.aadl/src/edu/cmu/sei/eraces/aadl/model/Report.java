@@ -3,7 +3,7 @@ package edu.cmu.sei.eraces.aadl.model;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.osate.aadl2.instance.ComponentInstance;
+import org.osate.aadl2.NamedElement;
 import org.osate.aadl2.instance.SystemInstance;
 import org.osate.aadl2.modelsupport.WriteToFile;
 
@@ -44,11 +44,10 @@ public class Report {
 			csvReport.addOutput(",");
 			csvReport.addOutput(ri.getJustification().toString());
 			csvReport.addOutput(",");
-			for (ComponentInstance ci : ri.getRelatedComponents()) {
-				csvReport.addOutput(ci.getName());
+			for (NamedElement ne : ri.getRelatedElements()) {
+				csvReport.addOutput(ne.getName());
 			}
 			csvReport.addOutput("\n");
-
 		}
 		csvReport.setFileExtension("csv");
 		csvReport.saveToFile();

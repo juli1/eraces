@@ -4,11 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.osate.aadl2.ComponentCategory;
+import org.osate.aadl2.NamedElement;
 import org.osate.aadl2.instance.ComponentInstance;
 import org.osate.aadl2.instance.ConnectionInstance;
 import org.osate.aadl2.instance.ConnectionInstanceEnd;
 import org.osate.aadl2.instance.FeatureInstance;
 import org.osate.aadl2.instance.SystemInstance;
+import org.osate.xtext.aadl2.properties.util.GetProperties;
 
 import edu.cmu.sei.eraces.aadl.model.Category;
 import edu.cmu.sei.eraces.aadl.model.Report;
@@ -42,8 +44,8 @@ public class OptimizationLogic {
 	 * @param dataInstance    - the shared data
 	 */
 	public void checkSharedData(ComponentInstance processInstance, ComponentInstance dataInstance) {
-		List<ComponentInstance> threads;
-		threads = new ArrayList<ComponentInstance>();
+		List<NamedElement> threads;
+		threads = new ArrayList<NamedElement>();
 
 		System.out.println("[checkSharedData] on data: " + dataInstance);
 
@@ -64,7 +66,7 @@ public class OptimizationLogic {
 
 		if (threads.size() > 0) {
 			ReportItem item = new ReportItem();
-			item.setRelatedComponent(threads);
+			item.setRelatedElements(threads);
 			item.setCategory(Category.SCOPE);
 			item.setJustification("Component share the same global variable - could be replaced by connections");
 			report.addItem(item);
@@ -86,11 +88,56 @@ public class OptimizationLogic {
 		}
 	}
 
-	public void checkSubcomponentsConnections(ComponentInstance componentInstance) {
-		System.out.println("[checkSubcomponentsConnections] " + componentInstance.getName());
+	public void checkComponentsPeriod(ComponentInstance source, ComponentInstance destination) {
+		ReportItem item = new ReportItem();
 
+		if ((GetProperties.getPeriodinMS(source) == 0) && (GetProperties.getPeriodinMS(destination) == 0)) {
+			return;
+		}
+
+		if (GetProperties.getPeriodinMS(source) == 0) {
+			item.setJustification("No period specification while the destination has one");
+			item.setCategory(Category.TASK);
+			item.addRelatedElement(source);
+			report.addItem(item);
+			return;
+		}
+
+		if (GetProperties.getPeriodinMS(destination) == 0) {
+			item.setJustification("No period specification while the source has one");
+			item.setCategory(Category.TASK);
+			item.addRelatedElement(destination);
+			report.addItem(item);
+			return;
+		}
+
+		if (GetProperties.getPeriodinMS(destination) > GetProperties.getPeriodinMicroSec(source)) {
+			item.setJustification("Destination has slower period than the source");
+			item.setCategory(Category.TASK);
+			item.addRelatedElement(destination);
+			item.addRelatedElement(source);
+			report.addItem(item);
+			return;
+		}
 	}
 
+	public void checkQueueSizes(FeatureInstance source, FeatureInstance destination) {
+		ReportItem item = new ReportItem();
+
+		if (GetProperties.getQueueSize(source) != GetProperties.getQueueSize(destination)) {
+			item.setJustification("Source and connection features does not have the same queue_size");
+			item.setCategory(Category.TASK);
+			item.addRelatedElement(destination);
+			item.addRelatedElement(source);
+			report.addItem(item);
+		}
+	}
+
+	/**
+	 * Process a connection instance and initiates all check
+	 * that could be done.
+	 * @param connection
+	 */
 	public void processConnection(ConnectionInstance connection) {
 
 		/**
@@ -100,13 +147,31 @@ public class OptimizationLogic {
 		 *   2. Queue dimension that does not match
 		 */
 		System.out.println("[processConnection] " + connection.getName());
-
+		FeatureInstance featureSource = null;
+		FeatureInstance featureDestination = null;
 		ConnectionInstanceEnd destination = connection.getDestination();
 		ConnectionInstanceEnd source = connection.getSource();
+
+		if (connection.getDestination() instanceof FeatureInstance) {
+			featureDestination = (FeatureInstance) connection.getDestination();
+		}
+
+		if (connection.getSource() instanceof FeatureInstance) {
+			featureSource = (FeatureInstance) connection.getSource();
+		}
+
 		ComponentInstance componentSource = Utils.getComponent(source);
 		ComponentInstance componentDestination = Utils.getComponent(destination);
+
+		checkComponentsPeriod(componentSource, componentDestination);
+		checkQueueSizes(featureSource, featureDestination);
 		System.out.println("[processConnection] component source=" + componentSource);
 		System.out.println("[processConnection] component dest  =" + componentDestination);
+	}
+
+	public void checkSubcomponentsConnections(ComponentInstance componentInstance) {
+		System.out.println("[checkSubcomponentsConnections] " + componentInstance.getName());
+
 	}
 
 	public void processComponent(ComponentInstance componentInstance) {
