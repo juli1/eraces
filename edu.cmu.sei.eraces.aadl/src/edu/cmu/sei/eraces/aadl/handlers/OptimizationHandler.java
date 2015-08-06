@@ -58,6 +58,7 @@ public class OptimizationHandler extends AbstractHandler {
 						instance = InstantiateModel.buildInstanceModelFile(systemImplementation);
 						OptimizationLogic logic = new OptimizationLogic(instance);
 						logic.process();
+						logic.getReport().export();
 						projectResource.refreshLocal(IResource.DEPTH_INFINITE, null);
 						// Refresh the project
 					} catch (Exception e) {
