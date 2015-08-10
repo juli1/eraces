@@ -20,7 +20,7 @@ import org.osate.aadl2.SystemImplementation;
 import org.osate.aadl2.instance.SystemInstance;
 import org.osate.aadl2.instantiation.InstantiateModel;
 
-import edu.cmu.sei.eraces.aadl.PreferenceConstants;
+import edu.cmu.sei.eraces.aadl.Activator;
 import edu.cmu.sei.eraces.aadl.logic.OptimizationLogic;
 import edu.cmu.sei.eraces.aadl.util.SelectionHelper;
 
@@ -73,8 +73,7 @@ public class OptimizationHandler extends AbstractHandler {
 			job.setPriority(Job.LONG);
 			job.schedule();
 		} else {
-			MessageDialog.openError(window.getShell(), PreferenceConstants.PLUGIN_ID,
-					"Please select a System Implementation");
+			MessageDialog.openError(window.getShell(), Activator.PLUGIN_ID, "Please select a System Implementation");
 		}
 
 		return null;

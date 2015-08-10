@@ -12,14 +12,16 @@ import org.osgi.framework.BundleContext;
  */
 public class Activator extends AbstractUIPlugin {
 
-	// The plug-in ID
-	public static final String PLUGIN_ID = PreferenceConstants.PLUGIN_ID;
+	// Eclipse-specific definitions
+	public static final String PLUGIN_ID = "Eraces";
+	public static final String ERACES_MARKER = "edu.cmu.sei.eraces.aadl.ValidationMarker";
 
 	// The shared instance
 	private static Activator plugin;
-	
-	private IPreferenceStore preferenceStore = new ScopedPreferenceStore(ConfigurationScope.INSTANCE, Activator.PLUGIN_ID);
-	
+
+	private IPreferenceStore preferenceStore = new ScopedPreferenceStore(ConfigurationScope.INSTANCE,
+			Activator.PLUGIN_ID);
+
 	/**
 	 * The constructor
 	 */
@@ -28,18 +30,20 @@ public class Activator extends AbstractUIPlugin {
 
 	/*
 	 * (non-Javadoc)
+	 * 
 	 * @see org.eclipse.ui.plugin.AbstractUIPlugin#start(org.osgi.framework.BundleContext)
 	 */
 	public void start(BundleContext context) throws Exception {
 		super.start(context);
 		plugin = this;
-		
+
 		// Call the preference initializer manually because eclipse will not call it if the preference page uses a scoped preference store
 		new PreferenceInitializer().initializeDefaultPreferences();
 	}
 
 	/*
 	 * (non-Javadoc)
+	 * 
 	 * @see org.eclipse.ui.plugin.AbstractUIPlugin#stop(org.osgi.framework.BundleContext)
 	 */
 	public void stop(BundleContext context) throws Exception {
@@ -51,7 +55,7 @@ public class Activator extends AbstractUIPlugin {
 	public IPreferenceStore getPreferenceStore() {
 		return preferenceStore;
 	}
-	
+
 	/**
 	 * Returns the shared instance
 	 * @return the shared instance

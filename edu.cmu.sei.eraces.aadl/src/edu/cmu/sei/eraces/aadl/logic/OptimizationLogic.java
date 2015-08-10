@@ -4,26 +4,40 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.osate.aadl2.ComponentCategory;
+import org.osate.aadl2.DataPort;
+import org.osate.aadl2.DataSubcomponentType;
+import org.osate.aadl2.EnumerationLiteral;
+import org.osate.aadl2.EventDataPort;
 import org.osate.aadl2.NamedElement;
 import org.osate.aadl2.instance.ComponentInstance;
 import org.osate.aadl2.instance.ConnectionInstance;
 import org.osate.aadl2.instance.ConnectionInstanceEnd;
+import org.osate.aadl2.instance.FeatureCategory;
 import org.osate.aadl2.instance.FeatureInstance;
 import org.osate.aadl2.instance.SystemInstance;
+import org.osate.aadl2.modelsupport.errorreporting.AnalysisErrorReporterManager;
+import org.osate.aadl2.modelsupport.errorreporting.MarkerAnalysisErrorReporter;
 import org.osate.xtext.aadl2.properties.util.GetProperties;
 
+import edu.cmu.sei.eraces.aadl.Activator;
 import edu.cmu.sei.eraces.aadl.model.Category;
 import edu.cmu.sei.eraces.aadl.model.Report;
 import edu.cmu.sei.eraces.aadl.model.ReportItem;
+import edu.cmu.sei.eraces.aadl.model.Severity;
 import edu.cmu.sei.eraces.aadl.util.Utils;
 
 public class OptimizationLogic {
 	private SystemInstance systemInstance;
 	private Report report;
+	private AnalysisErrorReporterManager errManager;
 
 	public OptimizationLogic(SystemInstance si) {
 		this.systemInstance = si;
 		this.report = new Report(si);
+
+		this.errManager = new AnalysisErrorReporterManager(new MarkerAnalysisErrorReporter.Factory(
+				Activator.ERACES_MARKER));
+
 	}
 
 	public Report getReport() {
@@ -38,12 +52,13 @@ public class OptimizationLogic {
 	}
 
 	/**
+	 * Check Pattern number 1
 	 * Check for any shared variable accessed by several threads in the same process.
 	 * 
 	 * @param processInstance - the process containing the data and other threads
 	 * @param dataInstance    - the shared data
 	 */
-	public void checkSharedData(ComponentInstance processInstance, ComponentInstance dataInstance) {
+	public void checkSharedDataAccess(ComponentInstance processInstance, ComponentInstance dataInstance) {
 		List<NamedElement> threads;
 		threads = new ArrayList<NamedElement>();
 
@@ -65,71 +80,181 @@ public class OptimizationLogic {
 		}
 
 		if (threads.size() > 0) {
-			ReportItem item = new ReportItem();
-			item.setRelatedElements(threads);
-			item.setCategory(Category.SCOPE);
-			item.setJustification("Component share the same global variable - could be replaced by connections");
-			report.addItem(item);
+			String msg = "Component share the same global variable - could be replaced by connections";
+			report(threads, msg, Category.SCOPE, Severity.MAJOR);
+		}
+	}
 
+	/**
+	 * Check Pattern2 - all shared data must have concurrency access protocol
+	 * @param processInstance
+	 * @param dataInstance
+	 */
+	public void checkSharedDataConcurrency(ComponentInstance processInstance, ComponentInstance dataInstance) {
+		if (GetProperties.getConcurrencyControlProtocol(dataInstance) == null) {
+			String msg = "Shared data must have a concurrency control protocol";
+			report(dataInstance, msg, Category.UNKNOWN, Severity.MAJOR);
 		}
 	}
 
 	/**
 	 * Check for all potential issue with shared data in the following process
+	 * This checks pattern 1 and pattern 2
 	 * @param processInstance - the process to investigate
 	 */
 	public void checkProcessSharedVariables(ComponentInstance processInstance) {
-		System.out.println("[checkProcessSharedVariables] " + processInstance.getName());
+//		System.out.println("[checkProcessSharedVariables] " + processInstance.getName());
 
 		for (ComponentInstance subcomponent : processInstance.getComponentInstances()) {
 			if (subcomponent.getCategory() == ComponentCategory.DATA) {
-				checkSharedData(processInstance, subcomponent);
+				checkSharedDataAccess(processInstance, subcomponent);
+				checkSharedDataConcurrency(processInstance, subcomponent);
 			}
 		}
 	}
 
+	/**
+	 * Check Pattern 3 - Harmonic tasks in the same process
+	 * @param processInstance - the process to investigate
+	 */
+	public void checkHarmonicTasks(ComponentInstance processInstance) {
+//		System.out.println("[checkProcessSharedVariables] " + processInstance.getName());
+
+		for (ComponentInstance subcomponent : processInstance.getComponentInstances()) {
+			if (subcomponent.getCategory() == ComponentCategory.THREAD) {
+				double period1 = GetProperties.getPeriodinMS(subcomponent);
+				for (ComponentInstance subcomponent2 : processInstance.getComponentInstances()) {
+					if (subcomponent2.getCategory() == ComponentCategory.THREAD) {
+						double period2 = GetProperties.getPeriodinMS(subcomponent2);
+						if (period1 == period2) {
+							List<NamedElement> nes;
+							nes = new ArrayList<NamedElement>();
+							nes.add(subcomponent);
+							nes.add(subcomponent2);
+							String msg = "Shared data must have a concurrency control protocol";
+							report(nes, msg, Category.UNKNOWN, Severity.MAJOR);
+						}
+					}
+				}
+			}
+
+		}
+	}
+
+	/**
+	 * Check Pattern 7 - check naming policy
+	 * @param relatedData - the component on which we check the naming policy
+	 */
+	public void checkNamingPolicy(ComponentInstance ci) {
+		String[] prefixes = { "is_", "do_", "has_" };
+
+		for (String prefix : prefixes) {
+			for (FeatureInstance fi : ci.getFeatureInstances()) {
+				if (fi.getName().startsWith(prefix)) {
+					String msg = "Uses an invalid prefix (" + prefix + ")";
+					report(fi, msg, Category.UNKNOWN, Severity.MAJOR);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Check Pattern 4 - Use of specific data types
+	 * @param relatedData - the dataType to check
+	 */
+	public void checkDataType(DataSubcomponentType relatedData) {
+		System.out.println("[checkDataType] " + relatedData.getName());
+		EnumerationLiteral representation = GetProperties.getDataRepresentation(relatedData);
+		String representationName = representation.getName();
+
+		String[] representationOK = { "struct", "union", "enum", "array" };
+		for (String s : representationOK) {
+			if (representationName.equalsIgnoreCase(s)) {
+				return;
+			}
+		}
+
+		if (representationName.equalsIgnoreCase("integer")) {
+			if (GetProperties.getDataIntegerRange(relatedData) == null) {
+				String msg = "Data uses an unconstrained type, use Integer_Range to specify range ";
+				report(relatedData, msg, Category.UNKNOWN, Severity.MAJOR);
+			}
+			return;
+		}
+
+		if (representationName.equalsIgnoreCase("float")) {
+			if (GetProperties.getDataRealRange(relatedData) == null) {
+				String msg = "Data uses an unconstrained type, use Real_Range to specify range";
+				report(relatedData, msg, Category.UNKNOWN, Severity.MAJOR);
+			}
+			return;
+		}
+
+		if ((representationName.equalsIgnoreCase("character")) || (representationName.equalsIgnoreCase("boolean"))) {
+			if (GetProperties.getDataRealRange(relatedData) == null) {
+				String msg = "Data uses a generic type, must be refined into a specific type";
+				report(relatedData, msg, Category.UNKNOWN, Severity.MAJOR);
+			}
+			return;
+		}
+
+		String msg = "Does not specify its representation";
+		report(relatedData, msg, Category.UNKNOWN, Severity.MAJOR);
+	}
+
+	/**
+	 * Check Pattern 6 - sampling ports components period
+	 * @param source
+	 * @param destination
+	 */
 	public void checkComponentsPeriod(ComponentInstance source, ComponentInstance destination) {
-		ReportItem item = new ReportItem();
+		double sourcePeriod;
+		double destinationPeriod;
 
-		if ((GetProperties.getPeriodinMS(source) == 0) && (GetProperties.getPeriodinMS(destination) == 0)) {
+		sourcePeriod = GetProperties.getPeriodinMS(source);
+		destinationPeriod = GetProperties.getPeriodinMS(destination);
+
+		if (sourcePeriod == 0) {
+			String msg = "No period specification while the destination has one";
+			report(source, msg, Category.TASK, Severity.MAJOR);
 			return;
 		}
 
-		if (GetProperties.getPeriodinMS(source) == 0) {
-			item.setJustification("No period specification while the destination has one");
-			item.setCategory(Category.TASK);
-			item.addRelatedElement(source);
-			report.addItem(item);
+		if (destinationPeriod == 0) {
+			String msg = "No period specification while the source has one";
+			report(destination, msg, Category.TASK, Severity.MAJOR);
 			return;
 		}
 
-		if (GetProperties.getPeriodinMS(destination) == 0) {
-			item.setJustification("No period specification while the source has one");
-			item.setCategory(Category.TASK);
-			item.addRelatedElement(destination);
-			report.addItem(item);
-			return;
-		}
-
-		if (GetProperties.getPeriodinMS(destination) > GetProperties.getPeriodinMicroSec(source)) {
-			item.setJustification("Destination has slower period than the source");
-			item.setCategory(Category.TASK);
-			item.addRelatedElement(destination);
-			item.addRelatedElement(source);
-			report.addItem(item);
+		if (destinationPeriod > sourcePeriod) {
+			String msg = "Destination has slower period than the source";
+			report(destination, msg, Category.TASK, Severity.MAJOR);
 			return;
 		}
 	}
 
+	/**
+	 * Check Pattern 5 - queue dimensions
+	 * @param source
+	 * @param destination
+	 */
 	public void checkQueueSizes(FeatureInstance source, FeatureInstance destination) {
-		ReportItem item = new ReportItem();
+		long destinationQueueSize = GetProperties.getQueueSize(destination);
+		ComponentInstance componentSource = Utils.getComponent(source);
+		ComponentInstance componentDestination = Utils.getComponent(destination);
 
-		if (GetProperties.getQueueSize(source) != GetProperties.getQueueSize(destination)) {
-			item.setJustification("Source and connection features does not have the same queue_size");
-			item.setCategory(Category.TASK);
-			item.addRelatedElement(destination);
-			item.addRelatedElement(source);
-			report.addItem(item);
+		if (destinationQueueSize == 0) {
+			destinationQueueSize = 1;
+		}
+
+		double sourcePeriod = GetProperties.getPeriodinMS(componentSource);
+		double destinationPeriod = GetProperties.getPeriodinMS(componentDestination);
+		double normalizedPeriodDestination = destinationPeriod / destinationQueueSize;
+
+		if (normalizedPeriodDestination > sourcePeriod) {
+			String msg = "Source send data too fast - receiver will drop packets. Considering changing the queue size";
+
+			report(destination, msg, Category.UNKNOWN, Severity.MAJOR);
 		}
 	}
 
@@ -163,10 +288,41 @@ public class OptimizationLogic {
 		ComponentInstance componentSource = Utils.getComponent(source);
 		ComponentInstance componentDestination = Utils.getComponent(destination);
 
-		checkComponentsPeriod(componentSource, componentDestination);
-		checkQueueSizes(featureSource, featureDestination);
-		System.out.println("[processConnection] component source=" + componentSource);
-		System.out.println("[processConnection] component dest  =" + componentDestination);
+		/**
+		 * Check Pattern 6
+		 */
+		if (featureSource.getCategory() == FeatureCategory.DATA_PORT) {
+			checkComponentsPeriod(componentSource, componentDestination);
+		}
+
+		/**
+		 * Check Pattern 5
+		 */
+		if (featureSource.getCategory() == FeatureCategory.EVENT_DATA_PORT) {
+			checkQueueSizes(featureSource, featureDestination);
+		}
+
+		/**
+		 * Check Pattern 4
+		 */
+		if ((featureSource.getCategory() == FeatureCategory.EVENT_DATA_PORT)
+				|| (featureSource.getCategory() == FeatureCategory.DATA_PORT)) {
+			if (featureSource.getCategory() == FeatureCategory.EVENT_DATA_PORT) {
+				System.out.println("[processConnection] featureSource=" + featureSource);
+				EventDataPort p = (EventDataPort) featureSource.getFeature();
+				checkDataType(p.getDataFeatureClassifier());
+			}
+
+			if (featureSource.getCategory() == FeatureCategory.DATA_PORT) {
+				System.out.println("[processConnection] featureSource=" + featureSource);
+				DataPort p = (DataPort) featureSource.getFeature();
+				checkDataType(p.getDataFeatureClassifier());
+
+			}
+
+		}
+//		System.out.println("[processConnection] component source=" + componentSource);
+//		System.out.println("[processConnection] component dest  =" + componentDestination);
 	}
 
 	public void checkSubcomponentsConnections(ComponentInstance componentInstance) {
@@ -185,6 +341,12 @@ public class OptimizationLogic {
 		if (componentInstance.getCategory() == ComponentCategory.PROCESS) {
 			checkProcessSharedVariables(componentInstance);
 			checkSubcomponentsConnections(componentInstance);
+			checkHarmonicTasks(componentInstance);
+			checkNamingPolicy(componentInstance);
+		}
+
+		if (componentInstance.getCategory() == ComponentCategory.THREAD) {
+			checkNamingPolicy(componentInstance);
 		}
 
 		for (FeatureInstance feature : componentInstance.getFeatureInstances()) {
@@ -194,6 +356,23 @@ public class OptimizationLogic {
 		for (ComponentInstance subcomponent : componentInstance.getComponentInstances()) {
 			processComponent(subcomponent);
 		}
-
 	}
+
+	public void report(List<NamedElement> elements, String message, Category category, Severity severity) {
+		ReportItem item = new ReportItem();
+		String msg = "Component share the same global variable - could be replaced by connections";
+		item.setRelatedElements(elements);
+		item.setCategory(Category.SCOPE);
+		item.setJustification(msg);
+		report.addItem(item);
+		for (NamedElement ne : elements) {
+			errManager.error(ne, msg);
+		}
+	}
+
+	public void report(NamedElement element, String message, Category category, Severity severity) {
+		ArrayList<NamedElement> els = new ArrayList<NamedElement>();
+		report(els, message, category, severity);
+	}
+
 }
