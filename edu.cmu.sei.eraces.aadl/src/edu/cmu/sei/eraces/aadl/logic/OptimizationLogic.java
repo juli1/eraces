@@ -136,8 +136,8 @@ public class OptimizationLogic {
 								nes = new ArrayList<NamedElement>();
 								nes.add(subcomponent);
 								nes.add(subcomponent2);
-								String msg = "Task have the same period, could be merged";
-								report(nes, msg, Category.TASK, Severity.MINOR);
+								String msg = "Task have the same period and could be merged";
+								report(nes, msg, Category.TASK, Severity.NORMAL);
 							}
 						}
 					}
@@ -172,6 +172,13 @@ public class OptimizationLogic {
 	public void checkDataType(DataSubcomponentType relatedData) {
 		System.out.println("[checkDataType] " + relatedData.getName());
 		EnumerationLiteral representation = GetProperties.getDataRepresentation(relatedData);
+
+		if (representation == null) {
+			String msg = "Data has no representation";
+			report(relatedData, msg, Category.DATA, Severity.MAJOR);
+			return;
+		}
+
 		String representationName = representation.getName();
 
 		String[] representationOK = { "struct", "union", "enum", "array" };
@@ -183,30 +190,30 @@ public class OptimizationLogic {
 
 		if (representationName.equalsIgnoreCase("integer")) {
 			if (GetProperties.getDataIntegerRange(relatedData) == null) {
-				String msg = "Data uses an unconstrained type, use Integer_Range to specify range ";
-				report(relatedData, msg, Category.UNKNOWN, Severity.MAJOR);
+				String msg = "Data uses an unconstrained type - use Integer_Range to specify range ";
+				report(relatedData, msg, Category.DATA, Severity.MAJOR);
 			}
 			return;
 		}
 
 		if (representationName.equalsIgnoreCase("float")) {
 			if (GetProperties.getDataRealRange(relatedData) == null) {
-				String msg = "Data uses an unconstrained type, use Real_Range to specify range";
-				report(relatedData, msg, Category.UNKNOWN, Severity.MAJOR);
+				String msg = "Data uses an unconstrained type - use Real_Range to specify range";
+				report(relatedData, msg, Category.DATA, Severity.MAJOR);
 			}
 			return;
 		}
 
 		if ((representationName.equalsIgnoreCase("character")) || (representationName.equalsIgnoreCase("boolean"))) {
 			if (GetProperties.getDataRealRange(relatedData) == null) {
-				String msg = "Data uses a generic type, must be refined into a specific type";
-				report(relatedData, msg, Category.UNKNOWN, Severity.MAJOR);
+				String msg = "Data uses a generic type - must be refined into a specific type";
+				report(relatedData, msg, Category.DATA, Severity.MAJOR);
 			}
 			return;
 		}
 
-		String msg = "Does not specify its representation";
-		report(relatedData, msg, Category.UNKNOWN, Severity.MAJOR);
+		String msg = "Data does not specify its representation";
+		report(relatedData, msg, Category.DATA, Severity.MAJOR);
 	}
 
 	/**
@@ -256,12 +263,63 @@ public class OptimizationLogic {
 
 		double sourcePeriod = GetProperties.getPeriodinMS(componentSource);
 		double destinationPeriod = GetProperties.getPeriodinMS(componentDestination);
-		double normalizedPeriodDestination = destinationPeriod / destinationQueueSize;
 
-		if (normalizedPeriodDestination > sourcePeriod) {
-			String msg = "Source send data too fast - receiver will drop packets. Considering changing the queue size";
+		System.out.println("[checkQueueSizes] component source      = " + componentSource.getName());
+		System.out.println("[checkQueueSizes] component destination = " + componentDestination.getName());
 
-			report(destination, msg, Category.UNKNOWN, Severity.MAJOR);
+		EnumerationLiteral dispatchSource = GetProperties.getDispatchProtocol(componentSource);
+		EnumerationLiteral dispatchDestination = GetProperties.getDispatchProtocol(componentDestination);
+
+		System.out.println("[checkQueueSizes] source dispatch       = "
+				+ GetProperties.getDispatchProtocol(componentSource));
+		System.out.println("[checkQueueSizes] destination dispatch  = "
+				+ GetProperties.getDispatchProtocol(componentDestination));
+
+		/**
+		 * If the sender and the receiver have a period declared, then
+		 * we can directly see if there is a potential issue.
+		 */
+		if ((sourcePeriod > 0) && (destinationPeriod > 0)) {
+			double normalizedPeriodDestination = destinationPeriod / destinationQueueSize;
+
+			if (normalizedPeriodDestination > sourcePeriod) {
+				String msg = "Source send data too fast - receiver will drop packets. Considering changing the queue size";
+
+				report(destination, msg, Category.TASK, Severity.MAJOR);
+			}
+			return;
+		}
+
+		/**
+		 * If the sender has a period but the receiver is aperiodic
+		 * without a period, we can then start to trace down the potential
+		 * data flows.
+		 */
+		if ((sourcePeriod > 0) && (destinationPeriod == 0)
+				&& (dispatchDestination.getName().equalsIgnoreCase("aperiodic"))) {
+			List<ComponentInstance> destinations = Utils.getDestinations(destination);
+
+			for (ComponentInstance dest : destinations) {
+				double period = GetProperties.getPeriodinMS(dest);
+				double wcet = GetProperties.getMaximumComputeExecutionTimeinMs(dest);
+
+				double normalizedPeriodDestination = 0;
+
+				if (period > 0) {
+					normalizedPeriodDestination = period / destinationQueueSize;
+				}
+
+				if (wcet > 0) {
+					normalizedPeriodDestination = wcet / destinationQueueSize;
+				}
+
+				if ((normalizedPeriodDestination > 0) && (normalizedPeriodDestination > sourcePeriod)) {
+					String msg = "Source send data too fast - receiver will drop packets. Considering changing the queue size";
+					report(destination, msg, Category.TASK, Severity.MAJOR);
+				}
+
+			}
+			return;
 		}
 	}
 
@@ -295,38 +353,46 @@ public class OptimizationLogic {
 		ComponentInstance componentSource = Utils.getComponent(source);
 		ComponentInstance componentDestination = Utils.getComponent(destination);
 
-		/**
-		 * Check Pattern 6
-		 */
-		if (featureSource.getCategory() == FeatureCategory.DATA_PORT) {
-			checkComponentsPeriod(componentSource, componentDestination);
-		}
-
-		/**
-		 * Check Pattern 5
-		 */
-		if (featureSource.getCategory() == FeatureCategory.EVENT_DATA_PORT) {
-			checkQueueSizes(featureSource, featureDestination);
-		}
-
-		/**
-		 * Check Pattern 4
-		 */
-		if ((featureSource.getCategory() == FeatureCategory.EVENT_DATA_PORT)
-				|| (featureSource.getCategory() == FeatureCategory.DATA_PORT)) {
-			if (featureSource.getCategory() == FeatureCategory.EVENT_DATA_PORT) {
-				System.out.println("[processConnection] featureSource=" + featureSource);
-				EventDataPort p = (EventDataPort) featureSource.getFeature();
-				checkDataType(p.getDataFeatureClassifier());
-			}
-
+		if ((featureSource != null) && (featureDestination != null)) {
+			/**
+			 * Check Pattern 6
+			 */
 			if (featureSource.getCategory() == FeatureCategory.DATA_PORT) {
-				System.out.println("[processConnection] featureSource=" + featureSource);
-				DataPort p = (DataPort) featureSource.getFeature();
-				checkDataType(p.getDataFeatureClassifier());
-
+				checkComponentsPeriod(componentSource, componentDestination);
 			}
 
+			/**
+			 * Check Pattern 5
+			 */
+			if (featureSource.getCategory() == FeatureCategory.EVENT_DATA_PORT) {
+				checkQueueSizes(featureSource, featureDestination);
+			}
+
+			/**
+			 * Check Pattern 4
+			 */
+			if ((featureSource.getCategory() == FeatureCategory.EVENT_DATA_PORT)
+					|| (featureSource.getCategory() == FeatureCategory.DATA_PORT)) {
+				if (featureSource.getCategory() == FeatureCategory.EVENT_DATA_PORT) {
+					System.out.println("[processConnection] featureSource=" + featureSource);
+					EventDataPort p = (EventDataPort) featureSource.getFeature();
+					checkDataType(p.getDataFeatureClassifier());
+				}
+
+				if (featureSource.getCategory() == FeatureCategory.DATA_PORT) {
+					System.out.println("[processConnection] featureSource=" + featureSource);
+					DataPort p = (DataPort) featureSource.getFeature();
+					DataSubcomponentType dst = p.getDataFeatureClassifier();
+					if (dst == null) {
+						String msg = "No data classifier associated with the feature";
+
+						report(featureSource, msg, Category.DATA, Severity.MAJOR);
+					} else {
+						checkDataType(dst);
+					}
+				}
+
+			}
 		}
 //		System.out.println("[processConnection] component source=" + componentSource);
 //		System.out.println("[processConnection] component dest  =" + componentDestination);
