@@ -56,7 +56,8 @@ public class ReportItem implements Comparable {
 	public int compareTo(Object arg) {
 		if (arg instanceof ReportItem) {
 			ReportItem other = (ReportItem) arg;
-			if ((other.getJustification().equalsIgnoreCase(this.justification))
+			if ((other.getRelatedElements().containsAll(relatedElements))
+					&& (other.getJustification().equalsIgnoreCase(this.justification))
 					&& (other.getSeverity() == this.getSeverity()) && (other.getCategory() == this.getCategory())) {
 				return 0;
 			}

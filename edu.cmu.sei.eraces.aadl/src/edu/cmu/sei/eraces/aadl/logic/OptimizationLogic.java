@@ -123,19 +123,26 @@ public class OptimizationLogic {
 		for (ComponentInstance subcomponent : processInstance.getComponentInstances()) {
 			if (subcomponent.getCategory() == ComponentCategory.THREAD) {
 				double period1 = GetProperties.getPeriodinMS(subcomponent);
-				for (ComponentInstance subcomponent2 : processInstance.getComponentInstances()) {
-					if (subcomponent2.getCategory() == ComponentCategory.THREAD) {
-						double period2 = GetProperties.getPeriodinMS(subcomponent2);
-						if (period1 == period2) {
-							List<NamedElement> nes;
-							nes = new ArrayList<NamedElement>();
-							nes.add(subcomponent);
-							nes.add(subcomponent2);
-							String msg = "Shared data must have a concurrency control protocol";
-							report(nes, msg, Category.UNKNOWN, Severity.MAJOR);
+
+				if (period1 == 0) {
+					String msg = "Task does not have a period declared";
+					report(subcomponent, msg, Category.TASK, Severity.MINOR);
+				} else {
+					for (ComponentInstance subcomponent2 : processInstance.getComponentInstances()) {
+						if (subcomponent2.getCategory() == ComponentCategory.THREAD) {
+							double period2 = GetProperties.getPeriodinMS(subcomponent2);
+							if (period1 == period2) {
+								List<NamedElement> nes;
+								nes = new ArrayList<NamedElement>();
+								nes.add(subcomponent);
+								nes.add(subcomponent2);
+								String msg = "Task have the same period, could be merged";
+								report(nes, msg, Category.TASK, Severity.MINOR);
+							}
 						}
 					}
 				}
+
 			}
 
 		}
@@ -271,7 +278,7 @@ public class OptimizationLogic {
 		 *   1. Connection with receiver at a faster rate than the sender
 		 *   2. Queue dimension that does not match
 		 */
-		System.out.println("[processConnection] " + connection.getName());
+//		System.out.println("[processConnection] " + connection.getName());
 		FeatureInstance featureSource = null;
 		FeatureInstance featureDestination = null;
 		ConnectionInstanceEnd destination = connection.getDestination();
@@ -360,19 +367,19 @@ public class OptimizationLogic {
 
 	public void report(List<NamedElement> elements, String message, Category category, Severity severity) {
 		ReportItem item = new ReportItem();
-		String msg = "Component share the same global variable - could be replaced by connections";
 		item.setRelatedElements(elements);
-		item.setCategory(Category.SCOPE);
-		item.setJustification(msg);
+		item.setCategory(category);
+		item.setJustification(message);
+		item.setSeverity(severity);
 		report.addItem(item);
 		for (NamedElement ne : elements) {
-			errManager.error(ne, msg);
+			errManager.error(ne, message);
 		}
 	}
 
 	public void report(NamedElement element, String message, Category category, Severity severity) {
 		ArrayList<NamedElement> els = new ArrayList<NamedElement>();
+		els.add(element);
 		report(els, message, category, severity);
 	}
-
 }
