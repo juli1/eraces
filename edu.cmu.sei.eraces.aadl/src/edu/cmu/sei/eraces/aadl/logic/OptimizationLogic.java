@@ -55,16 +55,16 @@ public class OptimizationLogic {
 	 * Check Pattern number 1
 	 * Check for any shared variable accessed by several threads in the same process.
 	 * 
-	 * @param processInstance - the process containing the data and other threads
-	 * @param dataInstance    - the shared data
+	 * @param componentInstance - the component containing the data and other threads
+	 * @param dataInstance      - the shared data
 	 */
-	public void checkSharedDataAccess(ComponentInstance processInstance, ComponentInstance dataInstance) {
-		List<NamedElement> threads;
-		threads = new ArrayList<NamedElement>();
+	public void checkSharedDataAccess(ComponentInstance componentInstance, ComponentInstance dataInstance) {
+		List<NamedElement> relatedComponents;
+		relatedComponents = new ArrayList<NamedElement>();
 
 		System.out.println("[checkSharedData] on data: " + dataInstance);
 
-		for (ConnectionInstance ci : processInstance.getConnectionInstances()) {
+		for (ConnectionInstance ci : componentInstance.getConnectionInstances()) {
 			ConnectionInstanceEnd destination = ci.getDestination();
 			ConnectionInstanceEnd source = ci.getSource();
 			ComponentInstance componentDestination = Utils.getComponent(destination);
@@ -72,16 +72,21 @@ public class OptimizationLogic {
 			System.out.println("[checkSharedData] source     : " + componentSource);
 			System.out.println("[checkSharedData] destination: " + componentDestination);
 			if (componentSource == dataInstance) {
-				threads.add(componentDestination);
+				relatedComponents.add(componentDestination);
 			}
 			if (componentDestination == dataInstance) {
-				threads.add(componentSource);
+				relatedComponents.add(componentSource);
 			}
 		}
 
-		if (threads.size() > 0) {
+		if (relatedComponents.size() > 0) {
 			String msg = "Component share the same global variable - could be replaced by connections";
-			report(threads, msg, Category.SCOPE, Severity.MAJOR);
+			report(relatedComponents, msg, Category.SCOPE, Severity.MAJOR);
+		}
+
+		if (relatedComponents.size() == 0) {
+			String msg = "Variable not connected to any component (useless)";
+			report(relatedComponents, msg, Category.SCOPE, Severity.NORMAL);
 		}
 	}
 
@@ -90,7 +95,11 @@ public class OptimizationLogic {
 	 * @param processInstance
 	 * @param dataInstance
 	 */
-	public void checkSharedDataConcurrency(ComponentInstance processInstance, ComponentInstance dataInstance) {
+	public void checkSharedDataConcurrency(ComponentInstance componentInstance, ComponentInstance dataInstance) {
+		if (componentInstance.getCategory() != ComponentCategory.PROCESS) {
+			return;
+		}
+
 		if (GetProperties.getConcurrencyControlProtocol(dataInstance) == null) {
 			String msg = "Shared data must have a concurrency control protocol";
 			report(dataInstance, msg, Category.UNKNOWN, Severity.MAJOR);
@@ -102,13 +111,13 @@ public class OptimizationLogic {
 	 * This checks pattern 1 and pattern 2
 	 * @param processInstance - the process to investigate
 	 */
-	public void checkProcessSharedVariables(ComponentInstance processInstance) {
+	public void checkProcessSharedVariables(ComponentInstance componentInstance) {
 //		System.out.println("[checkProcessSharedVariables] " + processInstance.getName());
 
-		for (ComponentInstance subcomponent : processInstance.getComponentInstances()) {
+		for (ComponentInstance subcomponent : componentInstance.getComponentInstances()) {
 			if (subcomponent.getCategory() == ComponentCategory.DATA) {
-				checkSharedDataAccess(processInstance, subcomponent);
-				checkSharedDataConcurrency(processInstance, subcomponent);
+				checkSharedDataAccess(componentInstance, subcomponent);
+				checkSharedDataConcurrency(componentInstance, subcomponent);
 			}
 		}
 	}
@@ -129,6 +138,10 @@ public class OptimizationLogic {
 					report(subcomponent, msg, Category.TASK, Severity.MINOR);
 				} else {
 					for (ComponentInstance subcomponent2 : processInstance.getComponentInstances()) {
+						if (subcomponent2 == subcomponent) {
+							continue;
+						}
+
 						if (subcomponent2.getCategory() == ComponentCategory.THREAD) {
 							double period2 = GetProperties.getPeriodinMS(subcomponent2);
 							if (period1 == period2) {
@@ -188,7 +201,7 @@ public class OptimizationLogic {
 			}
 		}
 
-		if (representationName.equalsIgnoreCase("integer")) {
+		if ((representationName.equalsIgnoreCase("integer")) || (representationName.equalsIgnoreCase("fixed"))) {
 			if (GetProperties.getDataIntegerRange(relatedData) == null) {
 				String msg = "Data uses an unconstrained type - use Integer_Range to specify range ";
 				report(relatedData, msg, Category.DATA, Severity.MAJOR);
